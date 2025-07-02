@@ -53,9 +53,8 @@ export default async function handler(req, res) {
                 <h2 style="color:#5e35b1;text-align:center;margin-bottom:8px;">SplitSmart</h2>
                 <p style="font-size:18px;color:#222;text-align:center;margin:0 0 18px 0;">Hi there,</p>
                 <p style="font-size:16px;color:#444;text-align:center;margin:0 0 24px 0;">Your verification code is:</p>
-                <div style="text-align:center;margin-bottom:24px;display:flex;justify-content:center;align-items:center;gap:12px;">
+                <div style="text-align:center;margin-bottom:24px;">
                   <span id="otp-code" style="display:inline-block;font-size:32px;letter-spacing:8px;font-weight:bold;color:#5e35b1;background:#ede7f6;padding:12px 32px;border-radius:12px;">${generatedOtp}</span>
-                  <button onclick="navigator.clipboard.writeText('${generatedOtp}')" style="background:#5e35b1;color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:15px;font-weight:500;">Copy</button>
                 </div>
                 <p style="font-size:15px;color:#666;text-align:center;margin-bottom:0;">Enter this code in the SplitSmart app to verify your email address.<br/>This code will expire in 5 minutes.</p>
                 <hr style="border:none;border-top:1px solid #eee;margin:32px 0 16px 0;"/>

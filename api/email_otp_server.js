@@ -3,17 +3,32 @@ import nodemailer from 'nodemailer';
 const otpStore = {};
 const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
-// Configure your SMTP transport (use your Gmail, Outlook, etc.)
+// Alternative Gmail configuration that often works better
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.SMTP_EMAIL,
     pass: process.env.SMTP_PASSWORD,
   },
+  tls: {
+    rejectUnauthorized: false
+  },
+  secure: false,
+  requireTLS: true,
 });
 
 export default async function handler(req, res) {
   console.log('Received request:', req.method, req.body);
+  
+  // Check if SMTP is configured
+  if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
+    console.error('SMTP credentials not configured');
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Email service not configured. Please contact administrator.' 
+    });
+  }
+
   if (req.method === 'POST') {
     const { email, otp } = req.body;
 
@@ -41,6 +56,7 @@ export default async function handler(req, res) {
       // Send OTP
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       otpStore[email] = { otp: generatedOtp, expires: Date.now() + OTP_EXPIRY_MS };
+      
       try {
         await transporter.sendMail({
           from: process.env.SMTP_EMAIL,
@@ -67,7 +83,11 @@ export default async function handler(req, res) {
         return res.json({ success: true });
       } catch (err) {
         console.error('Failed to send OTP email:', err);
-        return res.status(500).json({ success: false, error: err.message });
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to send email. Please try again later.',
+          details: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
       }
     } else {
       console.log('Email required but not provided');

@@ -18,11 +18,18 @@ const transporter = nodemailer.createTransport({
 });
 
 export default async function handler(req, res) {
-  console.log('Received request:', req.method, req.body);
+  console.log('=== OTP SERVER REQUEST START ===');
+  console.log('Timestamp:', new Date().toISOString());
+  console.log('Method:', req.method);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Body:', JSON.stringify(req.body, null, 2));
+  console.log('Environment check - SMTP_EMAIL:', process.env.SMTP_EMAIL ? 'SET' : 'NOT SET');
+  console.log('Environment check - SMTP_PASSWORD:', process.env.SMTP_PASSWORD ? 'SET' : 'NOT SET');
   
   // Check if SMTP is configured
   if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
-    console.error('SMTP credentials not configured');
+    console.error('❌ SMTP credentials not configured');
+    console.log('=== OTP SERVER REQUEST END - CONFIG ERROR ===');
     return res.status(500).json({ 
       success: false, 
       error: 'Email service not configured. Please contact administrator.' 
@@ -33,32 +40,70 @@ export default async function handler(req, res) {
     const { email, otp } = req.body;
 
     if (otp) {
+      console.log('🔍 OTP VERIFICATION REQUEST');
+      console.log('Email:', email);
+      console.log('OTP provided:', otp);
+      console.log('Current OTP store:', JSON.stringify(otpStore, null, 2));
+      
       // Verify OTP
       const record = otpStore[email];
       if (!record) {
-        console.log('No OTP sent to this email:', email);
+        console.log('❌ No OTP sent to this email:', email);
+        console.log('=== OTP SERVER REQUEST END - NO OTP FOUND ===');
         return res.status(400).json({ success: false, error: 'No OTP sent to this email' });
       }
+      
+      console.log('📅 OTP record found, checking expiry...');
+      console.log('OTP record:', JSON.stringify(record, null, 2));
+      console.log('Current time:', Date.now());
+      console.log('Expiry time:', record.expires);
+      console.log('Is expired:', Date.now() > record.expires);
+      
       if (Date.now() > record.expires) {
         delete otpStore[email];
-        console.log('OTP expired for:', email);
+        console.log('❌ OTP expired for:', email);
+        console.log('=== OTP SERVER REQUEST END - OTP EXPIRED ===');
         return res.status(400).json({ success: false, error: 'OTP expired' });
       }
+      
       if (record.otp === otp) {
         delete otpStore[email];
-        console.log('OTP verified for:', email);
+        console.log('✅ OTP verified successfully for:', email);
+        console.log('=== OTP SERVER REQUEST END - VERIFICATION SUCCESS ===');
         return res.json({ success: true });
       } else {
-        console.log('Invalid OTP for:', email);
+        console.log('❌ Invalid OTP for:', email);
+        console.log('Expected OTP:', record.otp);
+        console.log('Received OTP:', otp);
+        console.log('=== OTP SERVER REQUEST END - INVALID OTP ===');
         return res.status(400).json({ success: false, error: 'Invalid OTP' });
       }
     } else if (email) {
+      console.log('📧 OTP SENDING REQUEST');
+      console.log('Email:', email);
+      console.log('Current OTP store before generation:', JSON.stringify(otpStore, null, 2));
+      
       // Send OTP
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      otpStore[email] = { otp: generatedOtp, expires: Date.now() + OTP_EXPIRY_MS };
+      const expiryTime = Date.now() + OTP_EXPIRY_MS;
+      otpStore[email] = { otp: generatedOtp, expires: expiryTime };
+      
+      console.log('🔢 Generated OTP:', generatedOtp);
+      console.log('⏰ Expiry time:', new Date(expiryTime).toISOString());
+      console.log('📦 OTP store after generation:', JSON.stringify(otpStore, null, 2));
       
       try {
-        await transporter.sendMail({
+        console.log('📤 Attempting to send email...');
+        console.log('SMTP configuration:', {
+          service: 'gmail',
+          user: process.env.SMTP_EMAIL,
+          pass: process.env.SMTP_PASSWORD ? '***HIDDEN***' : 'NOT SET',
+          tls: { rejectUnauthorized: false },
+          secure: false,
+          requireTLS: true
+        });
+        
+        const mailResult = await transporter.sendMail({
           from: process.env.SMTP_EMAIL,
           to: email,
           subject: 'Your SplitSmart Verification Code',
@@ -79,10 +124,21 @@ export default async function handler(req, res) {
             </div>
           `,
         });
-        console.log('OTP sent to:', email, 'OTP:', generatedOtp);
+        
+        console.log('✅ Email sent successfully!');
+        console.log('📧 Mail result:', JSON.stringify(mailResult, null, 2));
+        console.log('📊 OTP sent to:', email, 'OTP:', generatedOtp);
+        console.log('=== OTP SERVER REQUEST END - EMAIL SENT SUCCESS ===');
         return res.json({ success: true });
       } catch (err) {
-        console.error('Failed to send OTP email:', err);
+        console.error('❌ Failed to send OTP email:', err);
+        console.error('❌ Error details:', {
+          message: err.message,
+          code: err.code,
+          response: err.response,
+          command: err.command
+        });
+        console.log('=== OTP SERVER REQUEST END - EMAIL SEND FAILED ===');
         return res.status(500).json({ 
           success: false, 
           error: 'Failed to send email. Please try again later.',
@@ -90,11 +146,13 @@ export default async function handler(req, res) {
         });
       }
     } else {
-      console.log('Email required but not provided');
+      console.log('❌ Email required but not provided');
+      console.log('=== OTP SERVER REQUEST END - EMAIL MISSING ===');
       return res.status(400).json({ success: false, error: 'Email required' });
     }
   } else {
-    console.log('Method not allowed:', req.method);
+    console.log('❌ Method not allowed:', req.method);
+    console.log('=== OTP SERVER REQUEST END - METHOD NOT ALLOWED ===');
     res.status(405).json({ error: 'Method not allowed' });
   }
 } 
